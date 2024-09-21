@@ -1,0 +1,64 @@
+name: "Expense Tracker API"
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - 5173:5173
+    command: npm run dev -- --host
+    develop:
+      watch:
+        - path: ./frontend/src
+          action: sync
+          target: /app/src
+
+        - action: rebuild
+          path: package.json
+
+        - path: ./frontend/static
+          action: rebuild
+          target: /app/static
+    depends_on:
+      backend:
+        condition: service_healthy
+  backend:
+    build: ./backend
+    ports:
+      - 8080:8080
+    # command: cargo run
+    healthcheck:
+      test: "curl -f http://localhost:8080"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    depends_on:
+      - surrealdb
+    env_file:
+      - .env
+    develop:
+      watch:
+        - path: ./backend/src
+          action: sync+restart
+          target: /app/src
+        - path: ./backend/Cargo.toml
+          action: sync+restart
+          target: /app/Cargo.toml
+  surrealdb:
+    env_file:
+      - .env
+    user: root
+    entrypoint:
+      - /surreal
+      - start
+      - file:/data/mydatabase.db
+      - --user
+      - $DB_USER
+      - --pass
+      - $DB_PASSWORD
+    image: surrealdb/surrealdb:latest
+    ports:
+      - 8000:8000
+    volumes:
+      - surrealdb_data:/data
+volumes:
+  surrealdb_data:
